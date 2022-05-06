@@ -22,6 +22,7 @@ $(() => {
             <div class="property-listing__price">$${property.cost_per_night/100.0}/night</div>
             ${isReservation ? `` :
               `<form class="make-reservation-form">
+                <input type="hidden" name="property_id" value="${property.id}">
                 <button type="submit">Make Reservation</button>
               </form>`
             }
@@ -35,7 +36,9 @@ $(() => {
 
   $(document.body).on('submit', '.make-reservation-form', function(event) {
     event.preventDefault();
-    views_manager.show('makeReservation');
+
+    const data = $(this).serializeArray();
+    views_manager.show('makeReservation', data[0].value);
   });
 
 });

@@ -51,7 +51,7 @@ exports.getUserWithId = getUserWithId;
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
-const addUser =  function(user) {
+const addUser = function(user) {
   return pool
     .query(`INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *;`, 
     [user.name, user.email, user.password])
@@ -71,23 +71,23 @@ exports.addUser = addUser;
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
-const getAllReservations = function(guest_id, limit = 10) {
+const getAllReservations = function(guest_id, limit = 20) {
   
   const queryString = `
-  SELECT reservations.*, properties.*, avg(rating) as average_rating
+  SELECT reservations.*, properties.*, avg(coalesce(rating, 0)) as average_rating
   FROM reservations
-  JOIN properties ON properties.id = reservations.property_id
-  JOIN property_reviews ON property_reviews.property_id = properties.id
+  LEFT JOIN properties ON properties.id = reservations.property_id
+  LEFT JOIN property_reviews ON property_reviews.property_id = properties.id
   WHERE reservations.guest_id = $1
   GROUP BY properties.id, reservations.id
   ORDER BY reservations.start_date
-  LIMIT $2;
-  `;
+  LIMIT $2`;
+
+  console.log(queryString, [guest_id, limit]);
 
   return pool
     .query(queryString, [guest_id, limit])
     .then((result) => {
-      console.log(result.rows);
       return result.rows;
     })
     .catch((err) => {
@@ -96,6 +96,67 @@ const getAllReservations = function(guest_id, limit = 10) {
 
 }
 exports.getAllReservations = getAllReservations;
+
+/**
+ * Get all reservations within a given date range.
+ * @param {date} start_date The start date of ther reservation.
+ * @param {date} end_date The end date of the reservation.
+ * @return {Promise<[{}]>} A promise to the reservations.
+ */
+ const checkReservationExists = function(start_date, end_date) {
+  
+  const queryString = `
+  SELECT *
+  FROM reservations
+  WHERE (start_date <= $2) and (end_date >= $1)
+  `;
+
+  return pool
+    .query(queryString, [start_date, end_date])
+    .then(res => {
+      console.log('checkReservationExists sending');
+      return res.rows;
+    })
+    .catch((err) => {
+      console.log(err.message);
+    });
+
+}
+exports.checkReservationExists = checkReservationExists;
+
+/**
+ * Add a reservation to the database
+ * @param {{}} reservation An object containing all of the reservation details.
+ * @return {Promise<{}>} A promise to the reservation.
+ */
+ const addReservation = function(reservation) {
+  const queryString = `
+  INSERT INTO reservations (
+    start_date,
+    end_date,
+    property_id,
+    guest_id
+  )
+  VALUES
+  ($1, $2, $3, $4) RETURNING *;`;
+
+  const queryParams = [
+    reservation.start_date,
+    reservation.end_date,
+    reservation.property_id,
+    reservation.guest_id
+  ];
+
+  return pool
+    .query(queryString, queryParams)
+    .then(res => {
+      return res;
+    })
+    .catch(err => {
+      console.log('Error:', err.stack);
+    });
+}
+exports.addReservation = addReservation;
 
 /// Properties
 
@@ -161,7 +222,7 @@ const getAllProperties = (options, limit = 10) => {
 
   console.log(queryString);
 
-  //6
+  //Submit
   return pool.query(queryString, queryParams).then((res) => res.rows);
 }
 exports.getAllProperties = getAllProperties;
@@ -175,21 +236,21 @@ exports.getAllProperties = getAllProperties;
 const addProperty = function(property) {
   const queryString = `
   INSERT INTO properties (
-    owner_id, 
-    title, 
-    description, 
-    thumbnail_photo_url, 
-    cover_photo_url, 
-    cost_per_night, 
-    street, 
-    city, 
-    province, 
-    post_code, 
-    country, 
-    parking_spaces, 
-    number_of_bathrooms, 
+    owner_id,
+    title,
+    description,
+    thumbnail_photo_url,
+    cover_photo_url,
+    cost_per_night,
+    street,
+    city,
+    province,
+    post_code,
+    country,
+    parking_spaces,
+    number_of_bathrooms,
     number_of_bedrooms
-  )  
+  )
   VALUES 
   ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *;`;
 
